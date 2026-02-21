@@ -356,9 +356,18 @@ function generateProject(targetDir, resolvedOptions) {
     "const Fastify = require('fastify')",
     '',
     'async function start() {',
-    resolvedOptions.prettyLogs
-      ? `  const app = Fastify({ logger: { level: '${resolvedOptions.logLevel ?? 'fatal'}', transport: { target: 'pino-pretty' } } })`
-      : `  const app = Fastify({ logger: { level: '${resolvedOptions.logLevel ?? 'fatal'}' } })`,
+    (() => {
+      const loggerConfig = resolvedOptions.prettyLogs
+        ? `{ level: '${resolvedOptions.logLevel ?? 'fatal'}', transport: { target: 'pino-pretty' } }`
+        : `{ level: '${resolvedOptions.logLevel ?? 'fatal'}' }`
+      const extras = [
+        resolvedOptions.pluginTimeout !== undefined ? `pluginTimeout: ${resolvedOptions.pluginTimeout}` : '',
+        resolvedOptions.bodyLimit !== undefined ? `bodyLimit: ${resolvedOptions.bodyLimit}` : '',
+        resolvedOptions.closeGraceDelay !== undefined ? `closeGraceDelay: ${resolvedOptions.closeGraceDelay}` : ''
+      ].filter(Boolean)
+      const opts = [`logger: ${loggerConfig}`, ...extras].join(', ')
+      return `  const app = Fastify({ ${opts} })`
+    })(),
     '',
     '  app.register(AutoLoad, {',
     "    dir: path.join(__dirname, 'plugins'),",
