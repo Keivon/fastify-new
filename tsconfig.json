@@ -13,6 +13,6 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["cli.ts", "cli.test.ts"],
+  "include": ["cli.ts", "cli.test.ts", "src/**/*.ts"],
   "exclude": ["node_modules", "dist", "test"]
 }

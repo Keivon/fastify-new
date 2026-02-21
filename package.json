@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "postbuild": "chmod +x dist/cli.js",
     "start": "node dist/cli.js",
     "dev": "tsx cli.ts",
     "test": "tsc && node --test dist/cli.test.js",
