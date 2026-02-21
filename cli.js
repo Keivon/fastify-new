@@ -127,7 +127,7 @@ async function main() {
     const resolvedOptions = await runSetupFlow(rl)
     const pluginScaffolds = await runPluginScaffoldWizard(rl)
     printPluginScaffoldSummary(pluginScaffolds)
-    const shouldRun = await askChoice(rl, 'Review complete. Continue?', ['Run', 'Cancel'])
+    const shouldRun = await askChoice(rl, 'Setup complete. Continue?', ['Generate', 'Cancel'])
 
     if (shouldRun === 'Cancel') {
       stdout.write(`\n${colorize('Cancelled. No files were written.', 'yellow')}\n`)
