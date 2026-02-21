@@ -7,6 +7,25 @@ const readline = require('node:readline/promises')
 const { stdin, stdout, stderr, exit } = require('node:process')
 
 const DEFAULT_IGNORE_WATCH = 'node_modules build dist .git bower_components logs .swp'
+const useColor = stdout.isTTY && stderr.isTTY && process.env.NO_COLOR === undefined
+
+const colors = {
+  reset: '\x1b[0m',
+  cyan: '\x1b[36m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  red: '\x1b[31m',
+  bold: '\x1b[1m',
+  gray: '\x1b[90m'
+}
+
+function colorize(text, tone) {
+  if (!useColor) {
+    return text
+  }
+
+  return `${colors[tone]}${text}${colors.reset}`
+}
 
 const categories = [
   {
@@ -96,12 +115,12 @@ async function main() {
     const shouldRun = await askChoice(rl, 'Review complete. Continue?', ['Run', 'Cancel'])
 
     if (shouldRun === 'Cancel') {
-      stdout.write('\nCancelled. No files were written.\n')
+      stdout.write(`\n${colorize('Cancelled. No files were written.', 'yellow')}\n`)
       return
     }
 
     generateProject(targetDir, resolvedOptions)
-    stdout.write(`\nProject created in ${targetDir}\n`)
+    stdout.write(`\n${colorize('Project created in', 'green')} ${colorize(targetDir, 'bold')}\n`)
   } finally {
     rl.close()
   }
@@ -194,10 +213,12 @@ function applyTrustProxyPrecedence(resolved) {
 }
 
 function printSummary(resolvedOptions) {
-  stdout.write('\nResolved setup options:\n')
+  stdout.write(`\n${colorize('Resolved setup options:', 'cyan')}\n`)
   for (const [key, value] of Object.entries(resolvedOptions)) {
     const printable = value === undefined ? '(default/unset)' : value
-    stdout.write(`- ${key}: ${printable}\n`)
+    const keyLabel = colorize(key, 'bold')
+    const valueLabel = value === undefined ? colorize(printable, 'gray') : printable
+    stdout.write(`- ${keyLabel}: ${valueLabel}\n`)
   }
   stdout.write('\n')
 }
@@ -231,7 +252,7 @@ async function askOption(rl, option) {
 
     const parsed = Number(response)
     if (Number.isNaN(parsed)) {
-      stdout.write('Invalid number, using default/unset.\n')
+      stdout.write(`${colorize('Invalid number, using default/unset.', 'yellow')}\n`)
       return option.default
     }
     return parsed
@@ -242,18 +263,18 @@ async function askOption(rl, option) {
 }
 
 async function askChoice(rl, message, options) {
-  stdout.write(`\n${message}\n`)
+  stdout.write(`\n${colorize(message, 'cyan')}\n`)
   options.forEach((option, index) => {
-    stdout.write(`  ${index + 1}) ${option}\n`)
+    stdout.write(`  ${colorize(String(index + 1), 'bold')}) ${option}\n`)
   })
 
   while (true) {
-    const answer = await rl.question('Select an option: ')
+    const answer = await rl.question(`${colorize('Select an option: ', 'bold')}`)
     const index = Number(answer)
     if (!Number.isNaN(index) && index >= 1 && index <= options.length) {
       return options[index - 1]
     }
-    stdout.write('Please enter a valid option number.\n')
+    stdout.write(`${colorize('Please enter a valid option number.', 'yellow')}\n`)
   }
 }
 
@@ -325,15 +346,15 @@ function generateProject(targetDir, resolvedOptions) {
 }
 
 function printHelp() {
-  stdout.write('Usage:\n')
-  stdout.write('  node cli.js generate <new-directory>\n\n')
-  stdout.write('MVP rules:\n')
-  stdout.write('- setup option flags are disabled\n')
-  stdout.write('- target must be a new directory\n')
+  stdout.write(`${colorize('Usage:', 'cyan')}\n`)
+  stdout.write(`  ${colorize('node cli.js generate <new-directory>', 'bold')}\n\n`)
+  stdout.write(`${colorize('MVP rules:', 'cyan')}\n`)
+  stdout.write(`- ${colorize('setup option flags are disabled', 'gray')}\n`)
+  stdout.write(`- ${colorize('target must be a new directory', 'gray')}\n`)
 }
 
 function fail(message) {
-  stderr.write(`${message}\n`)
+  stderr.write(`${colorize('Error:', 'red')} ${message}\n`)
   exit(1)
 }
 
