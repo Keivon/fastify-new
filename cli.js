@@ -279,6 +279,9 @@ function generateProject(targetDir, resolvedOptions) {
     private: true,
     scripts: {
       start: 'node app.js'
+    },
+    dependencies: {
+      fastify: '^5.0.0'
     }
   }
 
