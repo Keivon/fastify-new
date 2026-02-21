@@ -360,7 +360,9 @@ function generateProject(targetDir, resolvedOptions) {
     '',
     '  app.register(AutoLoad, {',
     "    dir: path.join(__dirname, 'routes'),",
-    '    options: {}',
+    resolvedOptions.prefix
+      ? `    options: { prefix: '${resolvedOptions.prefix}' }`
+      : '    options: {}',
     '  })',
     '',
     '  app.listen({',
