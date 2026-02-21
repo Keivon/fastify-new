@@ -96,6 +96,7 @@ function buildPackageJson(targetDir: string, resolvedOptions: ResolvedOptions): 
     dependencies: {
       '@fastify/autoload': '^6.0.0',
       '@fastify/sensible': '^6.0.0',
+      'close-with-grace': '^2.0.0',
       fastify: '^5.0.0',
       'fastify-plugin': '^5.0.0'
     },
@@ -139,15 +140,16 @@ function buildAppTs(resolvedOptions: ResolvedOptions): string {
   const extras = [
     resolvedOptions.pluginTimeout !== undefined ? `pluginTimeout: ${resolvedOptions.pluginTimeout}` : '',
     resolvedOptions.bodyLimit !== undefined ? `bodyLimit: ${resolvedOptions.bodyLimit}` : '',
-    resolvedOptions.closeGraceDelay !== undefined ? `closeGraceDelay: ${resolvedOptions.closeGraceDelay}` : '',
     trustProxyEntry
   ].filter(Boolean)
   const opts = [`logger: ${loggerConfig}`, ...extras].join(', ')
+  const closeGraceDelay = resolvedOptions.closeGraceDelay ?? 500
 
   return [
     "import path from 'node:path'",
     "import AutoLoad from '@fastify/autoload'",
     "import Fastify from 'fastify'",
+    "import closeWithGrace from 'close-with-grace'",
     '',
     'async function start(): Promise<void> {',
     `  const app = Fastify({ ${opts} })`,
@@ -162,6 +164,15 @@ function buildAppTs(resolvedOptions: ResolvedOptions): string {
     resolvedOptions.prefix
       ? `    options: { prefix: '${resolvedOptions.prefix}' }`
       : '    options: {}',
+    '  })',
+    '',
+    '  await app.ready()',
+    '',
+    `  closeWithGrace({ delay: ${closeGraceDelay} }, async ({ err }) => {`,
+    '    if (err) {',
+    '      app.log.error(err)',
+    '    }',
+    '    await app.close()',
     '  })',
     '',
     '  app.listen({',

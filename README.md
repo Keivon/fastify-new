@@ -1,4 +1,4 @@
-# fustily-new
+# fastify-new
 Answer a few prompts, get a custom fastify app in seconds.
 
 ## Use as `fastify-new`
@@ -9,6 +9,8 @@ Answer a few prompts, get a custom fastify app in seconds.
 sudo npm install --save-dev typescript tsx @types/node
 
 npx tsc
+
+npm run postbuild
 
 npm link
 
