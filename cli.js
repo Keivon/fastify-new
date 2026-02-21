@@ -19,6 +19,8 @@ const colors = {
   gray: '\x1b[90m'
 }
 
+const pluginMenuChoices = ['Route', 'Hook', 'Decorator', 'Child plugin', 'Done']
+
 function colorize(text, tone) {
   if (!useColor) {
     return text
@@ -123,6 +125,8 @@ async function main() {
   const rl = readline.createInterface({ input: stdin, output: stdout })
   try {
     const resolvedOptions = await runSetupFlow(rl)
+    const pluginScaffolds = await runPluginScaffoldWizard(rl)
+    printPluginScaffoldSummary(pluginScaffolds)
     const shouldRun = await askChoice(rl, 'Review complete. Continue?', ['Run', 'Cancel'])
 
     if (shouldRun === 'Cancel') {
@@ -130,7 +134,7 @@ async function main() {
       return
     }
 
-    generateProject(targetDir, resolvedOptions)
+    generateProject(targetDir, resolvedOptions, pluginScaffolds)
     stdout.write(`\n${colorize('Project created in', 'green')} ${colorize(targetDir, 'bold')}\n`)
   } finally {
     rl.close()
@@ -234,6 +238,159 @@ function printSummary(resolvedOptions) {
   stdout.write('\n')
 }
 
+async function runPluginScaffoldWizard(rl) {
+  const pluginScaffolds = []
+
+  while (true) {
+    let pluginName
+    const routeNames = []
+    const hookNames = []
+    let hasDecorator = false
+    let childPluginName
+
+    while (true) {
+      const promptMessage = pluginName
+        ? `What would you like to add to "${pluginName}"?`
+        : 'What would you like to add?'
+      const selected = await askChoice(rl, promptMessage, pluginMenuChoices)
+
+      if (selected === 'Done') {
+        break
+      }
+
+      if (!pluginName) {
+        pluginName = await askPluginName(rl, 'Plugin name')
+      }
+
+      if (selected === 'Child plugin') {
+        if (childPluginName) {
+          stdout.write(`${colorize('Child plugin already selected for this plugin.', 'yellow')}\n`)
+          continue
+        }
+
+        while (true) {
+          childPluginName = await askPluginName(rl, 'Child plugin name')
+          if (childPluginName !== pluginName) {
+            break
+          }
+
+          stdout.write(`${colorize('Child plugin name must be different from the parent plugin name.', 'yellow')}\n`)
+        }
+
+        stdout.write(`${colorize(`Added: Child plugin (${childPluginName})`, 'green')}\n`)
+        continue
+      }
+
+      if (selected === 'Decorator') {
+        if (hasDecorator) {
+          stdout.write(`${colorize('Decorator already selected for this plugin.', 'yellow')}\n`)
+          continue
+        }
+
+        hasDecorator = true
+        stdout.write(`${colorize('Added: Decorator', 'green')}\n`)
+        continue
+      }
+
+      if (selected === 'Route') {
+        const routeName = await askPluginName(rl, 'Route name')
+        if (routeNames.includes(routeName)) {
+          stdout.write(`${colorize(`Route "${routeName}" already exists for this plugin.`, 'yellow')}\n`)
+          continue
+        }
+
+        routeNames.push(routeName)
+        stdout.write(`${colorize(`Added: Route (${routeName})`, 'green')}\n`)
+        continue
+      }
+
+      if (selected === 'Hook') {
+        const hookName = await askPluginName(rl, 'Hook name')
+        if (hookNames.includes(hookName)) {
+          stdout.write(`${colorize(`Hook "${hookName}" already exists for this plugin.`, 'yellow')}\n`)
+          continue
+        }
+
+        hookNames.push(hookName)
+        stdout.write(`${colorize(`Added: Hook (${hookName})`, 'green')}\n`)
+        continue
+      }
+    }
+
+    if (!pluginName) {
+      break
+    }
+
+    pluginScaffolds.push({
+      pluginName,
+      routeNames,
+      hookNames,
+      hasDecorator,
+      childPluginName,
+      additions: []
+    })
+
+    const addAnotherPlugin = await askChoice(rl, 'Would you like to scaffold another plugin?', ['Yes', 'No'])
+    if (addAnotherPlugin === 'No') {
+      break
+    }
+  }
+
+  return pluginScaffolds
+}
+
+async function askPluginName(rl, label) {
+  while (true) {
+    const name = await askInput(rl, label, undefined)
+    if (/^[a-z][a-z0-9-]*$/.test(name)) {
+      return name
+    }
+
+    stdout.write(`${colorize('Use lowercase letters, numbers, and dashes only; must start with a letter.', 'yellow')}\n`)
+  }
+}
+
+function printPluginScaffoldSummary(pluginScaffolds) {
+  if (!pluginScaffolds || pluginScaffolds.length === 0) {
+    stdout.write(`${colorize('Plugin scaffold:', 'cyan')} ${colorize('none', 'gray')}\n\n`)
+    return
+  }
+
+  stdout.write(`${colorize('Plugin scaffolds:', 'cyan')}\n`)
+  for (const pluginScaffold of pluginScaffolds) {
+    const additions = []
+    if (pluginScaffold.routeNames.length > 0) {
+      additions.push(`routes x${pluginScaffold.routeNames.length}`)
+    }
+    if (pluginScaffold.hookNames.length > 0) {
+      additions.push(`hooks x${pluginScaffold.hookNames.length}`)
+    }
+    if (pluginScaffold.hasDecorator) {
+      additions.push('decorator')
+    }
+    if (pluginScaffold.childPluginName) {
+      additions.push('child plugin')
+    }
+
+    const additionsText = additions.length > 0
+      ? additions.join(', ')
+      : 'none (base plugin only)'
+
+    stdout.write(`- ${colorize(pluginScaffold.pluginName, 'bold')}: ${additionsText}\n`)
+    if (pluginScaffold.childPluginName) {
+      stdout.write(`  ${colorize('child plugin', 'bold')}: ${pluginScaffold.childPluginName}\n`)
+    }
+    if (pluginScaffold.routeNames.length > 0) {
+      stdout.write(`  ${colorize('routes', 'bold')}: ${pluginScaffold.routeNames.map((name) => `/${name}`).join(', ')}\n`)
+    }
+    if (pluginScaffold.hookNames.length > 0) {
+      stdout.write(`  ${colorize('hooks', 'bold')}: ${pluginScaffold.hookNames.join(', ')}\n`)
+    }
+  }
+
+  stdout.write('\n')
+}
+
 async function askOption(rl, option) {
   if (option.type === 'boolean') {
     const answer = await askChoice(rl, `${option.label}?`, ['No', 'Yes'])
@@ -301,7 +458,7 @@ async function askInput(rl, label, defaultValue) {
   return raw.trim()
 }
 
-function generateProject(targetDir, resolvedOptions) {
+function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
   const absoluteTarget = path.resolve(process.cwd(), targetDir)
   fs.mkdirSync(absoluteTarget, { recursive: false })
 
@@ -570,10 +727,34 @@ function generateProject(targetDir, resolvedOptions) {
     '',
     '## Resolved setup',
     '```json',
-    JSON.stringify(resolvedOptions, null, 2),
+    JSON.stringify({
+      options: resolvedOptions,
+      pluginScaffolds
+    }, null, 2),
     '```',
     ''
   ].join('\n')
+
+  const customPluginFiles = buildCustomPluginFiles(pluginScaffolds)
+  const baseGeneratedFilePaths = [
+    'package.json',
+    'app.js',
+    'plugins/sensible.js',
+    'plugins/support.js',
+    'routes/root.js',
+    'routes/root/index.js',
+    'test/helper.js',
+    'test/plugins/support.test.js',
+    'test/routes/root.test.js',
+    '.gitignore',
+    '.env',
+    'README.md'
+  ]
+
+  ensureNoDuplicateFilePaths([
+    ...baseGeneratedFilePaths,
+    ...customPluginFiles.map((file) => file.relativePath)
+  ])
 
   // Write all files
   fs.writeFileSync(path.join(absoluteTarget, 'package.json'), `${JSON.stringify(packageJson, null, 2)}\n`)
@@ -588,6 +769,144 @@ function generateProject(targetDir, resolvedOptions) {
   fs.writeFileSync(path.join(absoluteTarget, '.gitignore'), gitignore)
   fs.writeFileSync(path.join(absoluteTarget, '.env'), dotenv)
   fs.writeFileSync(path.join(absoluteTarget, 'README.md'), readme)
+
+  for (const file of customPluginFiles) {
+    fs.mkdirSync(path.dirname(path.join(absoluteTarget, file.relativePath)), { recursive: true })
+    fs.writeFileSync(path.join(absoluteTarget, file.relativePath), file.content)
+  }
+}
+
+function buildCustomPluginFiles(pluginScaffolds) {
+  if (!pluginScaffolds || pluginScaffolds.length === 0) {
+    return []
+  }
+
+  const files = []
+  for (const pluginScaffold of pluginScaffolds) {
+    files.push(...buildPluginFiles(pluginScaffold))
+  }
+
+  return files
+}
+
+function buildPluginFiles(pluginScaffold) {
+  if (!pluginScaffold) {
+    return []
+  }
+
+  const pluginRoot = path.posix.join('plugins', pluginScaffold.pluginName)
+  const routeNames = pluginScaffold.routeNames || []
+  const hookNames = pluginScaffold.hookNames || []
+  const hasDecorator = pluginScaffold.hasDecorator === true
+  const childPluginName = pluginScaffold.childPluginName || 'child'
+
+  const indexLines = [
+    "'use strict'",
+    '',
+    'module.exports = async function (fastify, opts) {'
+  ]
+
+  if (hasDecorator) {
+    indexLines.push("  require('./decorator')(fastify)")
+  }
+
+  for (const hookName of hookNames) {
+    indexLines.push(`  require('./hooks/${hookName}')(fastify)`)
+  }
+
+  for (const routeName of routeNames) {
+    indexLines.push(`  fastify.register(require('./routes/${routeName}'), { prefix: '/${routeName}' })`)
+  }
+
+  if (pluginScaffold.childPluginName) {
+    indexLines.push(`  fastify.register(require('./plugins/${childPluginName}'))`)
+  }
+
+  if (routeNames.length === 0 && hookNames.length === 0 && !hasDecorator && !pluginScaffold.childPluginName) {
+    indexLines.push('  return')
+  }
+
+  indexLines.push('}', '')
+
+  const files = [{
+    relativePath: `${pluginRoot}/index.js`,
+    content: indexLines.join('\n')
+  }]
+
+  for (const routeName of routeNames) {
+    files.push({
+      relativePath: `${pluginRoot}/routes/${routeName}/index.js`,
+      content: [
+        "'use strict'",
+        '',
+        'module.exports = async function (fastify, opts) {',
+        "  fastify.get('/', async function (request, reply) {",
+        `    return { plugin: '${pluginScaffold.pluginName}', route: '${routeName}' }`,
+        '  })',
+        '}',
+        ''
+      ].join('\n')
+    })
+  }
+
+  for (const hookName of hookNames) {
+    files.push({
+      relativePath: `${pluginRoot}/hooks/${hookName}.js`,
+      content: [
+        "'use strict'",
+        '',
+        'module.exports = function (fastify) {',
+        "  fastify.addHook('onRequest', async function (request, reply) {})",
+        '}',
+        ''
+      ].join('\n')
+    })
+  }
+
+  if (hasDecorator) {
+    files.push({
+      relativePath: `${pluginRoot}/decorator.js`,
+      content: [
+        "'use strict'",
+        '',
+        'module.exports = function (fastify) {',
+        "  fastify.decorate('" + pluginScaffold.pluginName + "Service', {",
+        '    ping () {',
+        "      return 'pong'",
+        '    }',
+        '  })',
+        '}',
+        ''
+      ].join('\n')
+    })
+  }
+
+  if (pluginScaffold.childPluginName) {
+    files.push({
+      relativePath: `${pluginRoot}/plugins/${childPluginName}.js`,
+      content: [
+        "'use strict'",
+        '',
+        'module.exports = async function (fastify, opts) {',
+        "  fastify.decorate('" + childPluginName + "Ready', true)",
+        '}',
+        ''
+      ].join('\n')
+    })
+  }
+
+  return files
+}
+
+function ensureNoDuplicateFilePaths(filePaths) {
+  const seen = new Set()
+
+  for (const filePath of filePaths) {
+    if (seen.has(filePath)) {
+      fail(`Duplicate generated file detected: ${filePath}`)
+    }
+    seen.add(filePath)
+  }
 }
 
 function printHelp() {
