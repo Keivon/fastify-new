@@ -116,7 +116,7 @@ test('CLI applies custom configurations for Network, Logging, and Debug categori
     '2',         // Guided setup
     '2',         // Configure Network
     '8080',      // Port
-    '0.0.0.0',   // Address
+    '0.0.0.0',   // Host
     '',          // Socket (empty = keep default)
     '/api',      // Prefix
     '2',         // Configure Logging
@@ -137,7 +137,7 @@ test('CLI applies custom configurations for Network, Logging, and Debug categori
   assert.strictEqual(code, 0, 'CLI should exit with code 0')
 
   assert.match(output, /- port: 8080/, 'Summary should reflect custom port')
-  assert.match(output, /- address: 0\.0\.0\.0/, 'Summary should reflect custom address')
+  assert.match(output, /- host: 0\.0\.0\.0/, 'Summary should reflect custom host')
   assert.match(output, /- prefix: \/api/, 'Summary should reflect custom prefix')
   assert.match(output, /- logLevel: info/, 'Summary should reflect custom log level')
   assert.match(output, /- prettyLogs: true/, 'Summary should reflect custom pretty logs')
@@ -150,7 +150,7 @@ test('CLI applies custom configurations for Network, Logging, and Debug categori
 
   const envContent = fs.readFileSync(envPath, 'utf8')
   assert.match(envContent, /PORT=8080/, '.env should contain PORT=8080')
-  assert.match(envContent, /ADDRESS=0\.0\.0\.0/, '.env should contain ADDRESS=0.0.0.0')
+  assert.match(envContent, /HOST=0\.0\.0\.0/, '.env should contain HOST=0.0.0.0')
   assert.match(envContent, /LOG_LEVEL=info/, '.env should contain LOG_LEVEL=info')
 
   fs.rmSync(targetDir, { recursive: true, force: true })

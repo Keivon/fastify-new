@@ -324,8 +324,8 @@ function generateProject(targetDir, resolvedOptions) {
     },
     scripts: {
       test: 'node --test test/**/*.test.js',
-      start: 'fastify start -l info app.js',
-      dev: 'fastify start -w -l info -P app.js'
+      start: 'node app.js',
+      dev: 'node app.js'
     },
     keywords: ['fastify'],
     author: '',
@@ -349,7 +349,9 @@ function generateProject(targetDir, resolvedOptions) {
     "const Fastify = require('fastify')",
     '',
     'async function start() {',
-    `  const app = Fastify({ logger: true })`,
+    resolvedOptions.prettyLogs
+      ? `  const app = Fastify({ logger: { level: '${resolvedOptions.logLevel ?? 'fatal'}', transport: { target: 'pino-pretty' } } })`
+      : `  const app = Fastify({ logger: { level: '${resolvedOptions.logLevel ?? 'fatal'}' } })`,
     '',
     '  app.register(AutoLoad, {',
     "    dir: path.join(__dirname, 'plugins'),",
