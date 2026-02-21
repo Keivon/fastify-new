@@ -143,3 +143,8 @@ vite.config.ts.timestamp-*
 
 # test file
 test
+
+
+ISSUE-1-freeze-mvp-contract.md
+ISSUE-2-prompt-flow-state-machine.md
+MVP-CONTRACT-generate-guided-flow.md
