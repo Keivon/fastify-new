@@ -517,10 +517,15 @@ function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
       const loggerConfig = resolvedOptions.prettyLogs
         ? `{ level: '${resolvedOptions.logLevel ?? 'fatal'}', transport: { target: 'pino-pretty' } }`
         : `{ level: '${resolvedOptions.logLevel ?? 'fatal'}' }`
+      const trustProxyValue = resolvedOptions.trustProxyEffective
+      const trustProxyEntry = trustProxyValue !== undefined
+        ? `trustProxy: ${typeof trustProxyValue === 'string' ? `'${trustProxyValue}'` : trustProxyValue}`
+        : ''
       const extras = [
         resolvedOptions.pluginTimeout !== undefined ? `pluginTimeout: ${resolvedOptions.pluginTimeout}` : '',
         resolvedOptions.bodyLimit !== undefined ? `bodyLimit: ${resolvedOptions.bodyLimit}` : '',
-        resolvedOptions.closeGraceDelay !== undefined ? `closeGraceDelay: ${resolvedOptions.closeGraceDelay}` : ''
+        resolvedOptions.closeGraceDelay !== undefined ? `closeGraceDelay: ${resolvedOptions.closeGraceDelay}` : '',
+        trustProxyEntry
       ].filter(Boolean)
       const opts = [`logger: ${loggerConfig}`, ...extras].join(', ')
       return `  const app = Fastify({ ${opts} })`
