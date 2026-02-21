@@ -6,7 +6,12 @@ Answer a few prompts, get a custom fastify app in seconds.
 ### Local development
 
 ```bash
+sudo npm install --save-dev typescript tsx @types/node
+
+npx tsc
+
 npm link
+
 fastify-new my-app
 ```
 
