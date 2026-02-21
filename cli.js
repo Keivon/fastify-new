@@ -91,20 +91,35 @@ const categories = [
 ]
 
 async function main() {
-  const [command, targetDir, ...rest] = process.argv.slice(2)
-
-  if (command !== 'generate') {
+  const args = process.argv.slice(2)
+  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
     printHelp()
-    exit(1)
+    exit(0)
+  }
+
+  let targetDir
+  let rest
+
+  if (args[0] === 'generate') {
+    targetDir = args[1]
+    rest = args.slice(2)
+  } else {
+    targetDir = args[0]
+    rest = args.slice(1)
   }
 
   if (!targetDir) {
-    fail('Missing target directory. Usage: node cli.js generate <new-directory>')
+    fail('Missing target directory. Usage: fastify-new <new-directory>')
   }
 
   const invalidArg = rest.find((arg) => arg.startsWith('-'))
   if (invalidArg) {
     fail(`Option flags are disabled in MVP setup flow: ${invalidArg}`)
+  }
+
+  const unexpectedArg = rest.find((arg) => !arg.startsWith('-'))
+  if (unexpectedArg) {
+    fail(`Unexpected argument: ${unexpectedArg}. Usage: fastify-new <new-directory>`)
   }
 
   validateNewProjectTarget(targetDir)
@@ -559,7 +574,9 @@ function generateProject(targetDir, resolvedOptions) {
 
 function printHelp() {
   stdout.write(`${colorize('Usage:', 'cyan')}\n`)
-  stdout.write(`  ${colorize('node cli.js generate <new-directory>', 'bold')}\n\n`)
+  stdout.write(`  ${colorize('fastify-new <new-directory>', 'bold')}\n`)
+  stdout.write(`  ${colorize('node cli.js <new-directory>', 'gray')}\n`)
+  stdout.write(`  ${colorize('node cli.js generate <new-directory> (legacy)', 'gray')}\n\n`)
   stdout.write(`${colorize('MVP rules:', 'cyan')}\n`)
   stdout.write(`- ${colorize('setup option flags are disabled', 'gray')}\n`)
   stdout.write(`- ${colorize('target must be a new directory', 'gray')}\n`)

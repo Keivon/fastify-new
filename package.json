@@ -1,0 +1,12 @@
+{
+  "name": "fastify-new",
+  "version": "0.1.0",
+  "description": "Interactive Fastify project scaffolder",
+  "license": "MIT",
+  "bin": {
+    "fastify-new": "./cli.js"
+  },
+  "scripts": {
+    "start": "node cli.js"
+  }
+}
