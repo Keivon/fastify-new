@@ -1,15 +1,14 @@
 #!/usr/bin/env node
-'use strict'
 
-const fs = require('node:fs')
-const path = require('node:path')
-const readline = require('node:readline/promises')
-const { stdin, stdout, stderr, exit } = require('node:process')
+import fs from 'node:fs'
+import path from 'node:path'
+import readline from 'node:readline/promises'
+import { stdin, stdout, stderr, exit } from 'node:process'
 
 const DEFAULT_IGNORE_WATCH = 'node_modules build dist .git bower_components logs .swp'
 const useColor = stdout.isTTY && stderr.isTTY && process.env.NO_COLOR === undefined
 
-const colors = {
+const colors: Record<string, string> = {
   reset: '\x1b[0m',
   cyan: '\x1b[36m',
   green: '\x1b[32m',
@@ -21,7 +20,7 @@ const colors = {
 
 const pluginMenuChoices = ['Route', 'Hook', 'Decorator', 'Child plugin', 'Done']
 
-function colorize(text, tone) {
+function colorize(text: string, tone: string): string {
   if (!useColor) {
     return text
   }
@@ -29,7 +28,39 @@ function colorize(text, tone) {
   return `${colors[tone]}${text}${colors.reset}`
 }
 
-const categories = [
+interface CategoryOption {
+  key: string
+  label: string
+  type: 'number' | 'string' | 'boolean' | 'tri-boolean' | 'choice'
+  choices?: string[]
+  default: number | string | boolean | undefined
+}
+
+interface Category {
+  key: string
+  name: string
+  options: CategoryOption[]
+}
+
+interface ResolvedOptions {
+  [key: string]: string | number | boolean | undefined
+}
+
+interface PluginScaffold {
+  pluginName: string
+  routeNames: string[]
+  hookNames: string[]
+  hasDecorator: boolean
+  childPluginName: string | undefined
+  additions: string[]
+}
+
+interface GeneratedFile {
+  relativePath: string
+  content: string
+}
+
+const categories: Category[] = [
   {
     key: 'network',
     name: 'Network',
@@ -92,7 +123,7 @@ const categories = [
   }
 ]
 
-async function main() {
+async function main(): Promise<void> {
   const args = process.argv.slice(2)
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
     printHelp()
@@ -141,7 +172,7 @@ async function main() {
   }
 }
 
-function validateNewProjectTarget(targetDir) {
+function validateNewProjectTarget(targetDir: string): void {
   if (targetDir === '.') {
     fail('Current directory generation is disabled in MVP. Use a new directory name.')
   }
@@ -152,7 +183,7 @@ function validateNewProjectTarget(targetDir) {
   }
 }
 
-async function runSetupFlow(rl) {
+async function runSetupFlow(rl: readline.Interface): Promise<ResolvedOptions> {
   const mode = await askChoice(rl, 'How do you want to set this up?', [
     'Default setup (quick start)',
     'Guided setup (choose by category)'
@@ -164,7 +195,7 @@ async function runSetupFlow(rl) {
     return defaults
   }
 
-  const resolved = {}
+  const resolved: ResolvedOptions = {}
   for (const category of categories) {
     const categoryAction = await askChoice(rl, `${category.name}: choose how to continue`, [
       'Skip this category (use defaults)',
@@ -184,8 +215,8 @@ async function runSetupFlow(rl) {
   return resolved
 }
 
-function buildAllDefaults() {
-  const resolved = {}
+function buildAllDefaults(): ResolvedOptions {
+  const resolved: ResolvedOptions = {}
   for (const category of categories) {
     applyCategoryDefaults(category, resolved)
   }
@@ -193,13 +224,13 @@ function buildAllDefaults() {
   return resolved
 }
 
-function applyCategoryDefaults(category, resolved) {
+function applyCategoryDefaults(category: Category, resolved: ResolvedOptions): void {
   for (const option of category.options) {
     resolved[option.key] = option.default
   }
 }
 
-async function promptCategoryOptions(rl, category, resolved) {
+async function promptCategoryOptions(rl: readline.Interface, category: Category, resolved: ResolvedOptions): Promise<void> {
   for (const option of category.options) {
     resolved[option.key] = await askOption(rl, option)
   }
@@ -208,7 +239,7 @@ async function promptCategoryOptions(rl, category, resolved) {
   }
 }
 
-function applyTrustProxyPrecedence(resolved) {
+function applyTrustProxyPrecedence(resolved: ResolvedOptions): void {
   if (typeof resolved.trustProxyEnabled === 'boolean') {
     resolved.trustProxyEffective = resolved.trustProxyEnabled
     return
@@ -227,26 +258,26 @@ function applyTrustProxyPrecedence(resolved) {
   resolved.trustProxyEffective = undefined
 }
 
-function printSummary(resolvedOptions) {
+function printSummary(resolvedOptions: ResolvedOptions): void {
   stdout.write(`\n${colorize('Resolved setup options:', 'cyan')}\n`)
   for (const [key, value] of Object.entries(resolvedOptions)) {
     const printable = value === undefined ? '(default/unset)' : value
     const keyLabel = colorize(key, 'bold')
-    const valueLabel = value === undefined ? colorize(printable, 'gray') : printable
+    const valueLabel = value === undefined ? colorize(String(printable), 'gray') : printable
     stdout.write(`- ${keyLabel}: ${valueLabel}\n`)
   }
   stdout.write('\n')
 }
 
-async function runPluginScaffoldWizard(rl) {
-  const pluginScaffolds = []
+async function runPluginScaffoldWizard(rl: readline.Interface): Promise<PluginScaffold[]> {
+  const pluginScaffolds: PluginScaffold[] = []
 
   while (true) {
-    let pluginName
-    const routeNames = []
-    const hookNames = []
+    let pluginName: string | undefined
+    const routeNames: string[] = []
+    const hookNames: string[] = []
     let hasDecorator = false
-    let childPluginName
+    let childPluginName: string | undefined
 
     while (true) {
       const promptMessage = pluginName
@@ -339,7 +370,7 @@ async function runPluginScaffoldWizard(rl) {
   return pluginScaffolds
 }
 
-async function askPluginName(rl, label) {
+async function askPluginName(rl: readline.Interface, label: string): Promise<string> {
   while (true) {
     const name = await askInput(rl, label, undefined)
     if (/^[a-z][a-z0-9-]*$/.test(name)) {
@@ -350,7 +381,7 @@ async function askPluginName(rl, label) {
   }
 }
 
-function printPluginScaffoldSummary(pluginScaffolds) {
+function printPluginScaffoldSummary(pluginScaffolds: PluginScaffold[]): void {
   if (!pluginScaffolds || pluginScaffolds.length === 0) {
     stdout.write(`${colorize('Plugin scaffold:', 'cyan')} ${colorize('none', 'gray')}\n\n`)
     return
@@ -358,7 +389,7 @@ function printPluginScaffoldSummary(pluginScaffolds) {
 
   stdout.write(`${colorize('Plugin scaffolds:', 'cyan')}\n`)
   for (const pluginScaffold of pluginScaffolds) {
-    const additions = []
+    const additions: string[] = []
     if (pluginScaffold.routeNames.length > 0) {
       additions.push(`routes x${pluginScaffold.routeNames.length}`)
     }
@@ -391,7 +422,7 @@ function printPluginScaffoldSummary(pluginScaffolds) {
   stdout.write('\n')
 }
 
-async function askOption(rl, option) {
+async function askOption(rl: readline.Interface, option: CategoryOption): Promise<string | number | boolean | undefined> {
   if (option.type === 'boolean') {
     const answer = await askChoice(rl, `${option.label}?`, ['No', 'Yes'])
     return answer === 'Yes'
@@ -409,7 +440,7 @@ async function askOption(rl, option) {
   }
 
   if (option.type === 'choice') {
-    return askChoice(rl, `${option.label}:`, option.choices)
+    return askChoice(rl, `${option.label}:`, option.choices!)
   }
 
   if (option.type === 'number') {
@@ -430,7 +461,7 @@ async function askOption(rl, option) {
   return response === '' ? undefined : response
 }
 
-async function askChoice(rl, message, options) {
+async function askChoice(rl: readline.Interface, message: string, options: string[]): Promise<string> {
   stdout.write(`\n${colorize(message, 'cyan')}\n`)
   options.forEach((option, index) => {
     stdout.write(`  ${colorize(String(index + 1), 'bold')}) ${option}\n`)
@@ -446,7 +477,7 @@ async function askChoice(rl, message, options) {
   }
 }
 
-async function askInput(rl, label, defaultValue) {
+async function askInput(rl: readline.Interface, label: string, defaultValue: string | number | boolean | undefined): Promise<string> {
   const suffix = defaultValue === undefined ? '' : ` [default: ${defaultValue}]`
   const raw = await rl.question(`${label}${suffix}: `)
   if (raw.trim() === '') {
@@ -458,7 +489,7 @@ async function askInput(rl, label, defaultValue) {
   return raw.trim()
 }
 
-function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
+function generateProject(targetDir: string, resolvedOptions: ResolvedOptions, pluginScaffolds: PluginScaffold[]): void {
   const absoluteTarget = path.resolve(process.cwd(), targetDir)
   fs.mkdirSync(absoluteTarget, { recursive: false })
 
@@ -475,20 +506,20 @@ function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
     name: path.basename(targetDir),
     version: '1.0.0',
     description: 'A Fastify application',
-    main: 'app.js',
+    main: 'dist/app.js',
     directories: {
       test: 'test'
     },
     scripts: {
-      test: 'node --test test/**/*.test.js',
+      build: 'tsc',
+      test: 'tsx --test test/**/*.test.ts',
       start: resolvedOptions.debug
-        ? `node --inspect=${resolvedOptions.debugHost ?? 'localhost'}:${resolvedOptions.debugPort ?? 9320} app.js`
-        : 'node app.js',
+        ? `node --inspect=${resolvedOptions.debugHost ?? 'localhost'}:${resolvedOptions.debugPort ?? 9320} dist/app.js`
+        : 'node dist/app.js',
       dev: [
-        'node',
-        resolvedOptions.watch ? '--watch' : '',
-        resolvedOptions.debug ? `--inspect=${resolvedOptions.debugHost ?? 'localhost'}:${resolvedOptions.debugPort ?? 9320}` : '',
-        'app.js'
+        'tsx',
+        resolvedOptions.watch ? 'watch' : '',
+        'app.ts'
       ].filter(Boolean).join(' ')
     },
     keywords: ['fastify'],
@@ -498,21 +529,42 @@ function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
       '@fastify/autoload': '^6.0.0',
       '@fastify/sensible': '^6.0.0',
       fastify: '^5.0.0',
-      'fastify-cli': '^7.0.0',
       'fastify-plugin': '^5.0.0'
     },
-    devDependencies: {}
+    devDependencies: {
+      '@types/node': '^22.0.0',
+      typescript: '^5.0.0',
+      tsx: '^4.0.0'
+    }
   }
 
-  // app.js — the entry point consumed by `fastify start`
-  const appJs = [
-    "'use strict'",
+  // tsconfig.json for the generated project
+  const tsconfig = {
+    compilerOptions: {
+      target: 'ES2022',
+      module: 'commonjs',
+      lib: ['ES2022'],
+      outDir: './dist',
+      rootDir: './',
+      strict: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      forceConsistentCasingInFileNames: true,
+      resolveJsonModule: true,
+      declaration: true,
+      sourceMap: true
+    },
+    include: ['**/*.ts'],
+    exclude: ['node_modules', 'dist']
+  }
+
+  // app.ts — the entry point
+  const appTs = [
+    "import path from 'node:path'",
+    "import AutoLoad from '@fastify/autoload'",
+    "import Fastify from 'fastify'",
     '',
-    "const path = require('node:path')",
-    "const AutoLoad = require('@fastify/autoload')",
-    "const Fastify = require('fastify')",
-    '',
-    'async function start() {',
+    'async function start(): Promise<void> {',
     (() => {
       const loggerConfig = resolvedOptions.prettyLogs
         ? `{ level: '${resolvedOptions.logLevel ?? 'fatal'}', transport: { target: 'pino-pretty' } }`
@@ -551,7 +603,7 @@ function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
     '      app.log.error(err)',
     '      process.exit(1)',
     '    }',
-    "    app.log.info(`server listening on ${app.server.address().port}`)",
+    "    app.log.info(`server listening on ${app.server.address()}`)",
     '  })',
     '}',
     '',
@@ -559,29 +611,26 @@ function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
     ''
   ].join('\n')
 
-  // plugins/sensible.js
+  // plugins/sensible.ts
   const pluginSensible = [
-    "'use strict'",
-    '',
-    "const fp = require('fastify-plugin')",
-    "const sensible = require('@fastify/sensible')",
+    "import fp from 'fastify-plugin'",
+    "import sensible from '@fastify/sensible'",
     '',
     '/**',
     ' * This plugins adds some utilities to handle http errors',
     ' *',
     ' * @see https://github.com/fastify/fastify-sensible',
     ' */',
-    'module.exports = fp(async function (fastify, opts) {',
+    'export default fp(async function (fastify) {',
     '  fastify.register(sensible)',
     '})',
     ''
   ].join('\n')
 
-  // plugins/support.js
+  // plugins/support.ts
   const pluginSupport = [
-    "'use strict'",
-    '',
-    "const fp = require('fastify-plugin')",
+    "import fp from 'fastify-plugin'",
+    "import { FastifyInstance } from 'fastify'",
     '',
     '// the use of fastify-plugin is required to be able',
     '// to export the decorators to the outer scope',
@@ -590,7 +639,7 @@ function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
     ' * This defines the support plugin for the application.',
     ' * You can use fastify.someSupport() to call it from your routes.',
     ' */',
-    'module.exports = fp(async function (fastify, opts) {',
+    'export default fp(async function (fastify: FastifyInstance) {',
     "  fastify.decorate('someSupport', function () {",
     "    return 'hugs'",
     '  })',
@@ -598,28 +647,28 @@ function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
     ''
   ].join('\n')
 
-  // routes/root.js
+  // routes/root.ts
   const routeRoot = [
-    "'use strict'",
+    "import { FastifyInstance, FastifyPluginOptions } from 'fastify'",
     '',
     '/**',
     ' * A plugin that provide encapsulated routes, under prefix',
-    ' * @param {FastifyInstance} fastify encapsulated fastify instance',
-    ' * @param {Object} options plugin options, refer to https://fastify.dev/docs/latest/Reference/Plugins/',
+    ' * @param fastify encapsulated fastify instance',
+    ' * @param opts plugin options',
     ' */',
-    'module.exports = async function (fastify, opts) {',
+    'export default async function (fastify: FastifyInstance, opts: FastifyPluginOptions): Promise<void> {',
     "  fastify.get('/', async function (request, reply) {",
-    "    return { root: true }",
+    '    return { root: true }',
     '  })',
     '}',
     ''
   ].join('\n')
 
-  // routes/root/index.js (auto-loaded as /root)
+  // routes/root/index.ts (auto-loaded as /root)
   const routeRootIndex = [
-    "'use strict'",
+    "import { FastifyInstance, FastifyPluginOptions } from 'fastify'",
     '',
-    'module.exports = async function (fastify, opts) {',
+    'export default async function (fastify: FastifyInstance, opts: FastifyPluginOptions): Promise<void> {',
     "  fastify.get('/', async function (request, reply) {",
     "    return 'root'",
     '  })',
@@ -627,53 +676,45 @@ function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
     ''
   ].join('\n')
 
-  // test/helper.js
+  // test/helper.ts
   const testHelper = [
-    "'use strict'",
-    '',
     '// This file contains code that will be run before your tests.',
-    "const { build } = require('../app')",
+    "import { build } from '../app'",
     '',
-    'async function buildApp (t) {',
+    'async function buildApp(t: any): Promise<any> {',
     '  const app = await build()',
     '  t.after(() => app.close())',
     '  return app',
     '}',
     '',
-    'module.exports = {',
-    '  buildApp',
-    '}',
+    'export { buildApp }',
     ''
   ].join('\n')
 
-  // test/plugins/support.test.js
+  // test/plugins/support.test.ts
   const testPluginSupport = [
-    "'use strict'",
-    '',
-    "const { test } = require('node:test')",
-    "const assert = require('node:assert')",
-    "const { buildApp } = require('../helper')",
+    "import { test } from 'node:test'",
+    "import assert from 'node:assert'",
+    "import { buildApp } from '../helper'",
     '',
     "test('support plugin', async (t) => {",
     '  const app = await buildApp(t)',
-    "  assert.ok(app.someSupport())",
+    '  assert.ok(app.someSupport())',
     '})',
     ''
   ].join('\n')
 
-  // test/routes/root.test.js
+  // test/routes/root.test.ts
   const testRouteRoot = [
-    "'use strict'",
-    '',
-    "const { test } = require('node:test')",
-    "const assert = require('node:assert')",
-    "const { buildApp } = require('../helper')",
+    "import { test } from 'node:test'",
+    "import assert from 'node:assert'",
+    "import { buildApp } from '../helper'",
     '',
     "test('root route', async (t) => {",
     '  const app = await buildApp(t)',
     "  const response = await app.inject({ method: 'GET', url: '/' })",
-    "  assert.strictEqual(response.statusCode, 200)",
-    "  assert.deepStrictEqual(JSON.parse(response.body), { root: true })",
+    '  assert.strictEqual(response.statusCode, 200)',
+    '  assert.deepStrictEqual(JSON.parse(response.body), { root: true })',
     '})',
     ''
   ].join('\n')
@@ -681,14 +722,14 @@ function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
   // .gitignore
   const gitignore = [
     'node_modules',
+    'dist',
     '.DS_Store',
     '*.log',
     'build',
-    'dist',
     ''
   ].join('\n')
 
-  // .env (used by fastify-cli for overrides at runtime)
+  // .env (used for runtime overrides)
   const dotenv = [
     `PORT=${resolvedOptions.port ?? 3000}`,
     resolvedOptions.host ? `HOST=${resolvedOptions.host}` : '# HOST=',
@@ -706,28 +747,30 @@ function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
     '',
     '```bash',
     'npm install',
-    'npm run dev   # watch mode',
-    'npm start     # production',
-    'npm test      # run tests',
+    'npm run dev     # development with tsx',
+    'npm run build   # compile TypeScript',
+    'npm start       # production (compiled)',
+    'npm test        # run tests',
     '```',
     '',
     '## Project layout',
     '',
     '```',
-    '├── app.js            # entry point (loaded by fastify-cli)',
-    '├── plugins/          # shared plugins (decorated on fastify instance)',
-    '│   ├── sensible.js',
-    '│   └── support.js',
-    '├── routes/           # encapsulated route plugins',
-    '│   ├── root.js',
+    '├── app.ts             # entry point',
+    '├── tsconfig.json      # TypeScript configuration',
+    '├── plugins/           # shared plugins (decorated on fastify instance)',
+    '│   ├── sensible.ts',
+    '│   └── support.ts',
+    '├── routes/            # encapsulated route plugins',
+    '│   ├── root.ts',
     '│   └── root/',
-    '│       └── index.js',
+    '│       └── index.ts',
     '└── test/',
-    '    ├── helper.js',
+    '    ├── helper.ts',
     '    ├── plugins/',
-    '    │   └── support.test.js',
+    '    │   └── support.test.ts',
     '    └── routes/',
-    '        └── root.test.js',
+    '        └── root.test.ts',
     '```',
     '',
     '## Resolved setup',
@@ -743,14 +786,15 @@ function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
   const customPluginFiles = buildCustomPluginFiles(pluginScaffolds)
   const baseGeneratedFilePaths = [
     'package.json',
-    'app.js',
-    'plugins/sensible.js',
-    'plugins/support.js',
-    'routes/root.js',
-    'routes/root/index.js',
-    'test/helper.js',
-    'test/plugins/support.test.js',
-    'test/routes/root.test.js',
+    'tsconfig.json',
+    'app.ts',
+    'plugins/sensible.ts',
+    'plugins/support.ts',
+    'routes/root.ts',
+    'routes/root/index.ts',
+    'test/helper.ts',
+    'test/plugins/support.test.ts',
+    'test/routes/root.test.ts',
     '.gitignore',
     '.env',
     'README.md'
@@ -763,14 +807,15 @@ function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
 
   // Write all files
   fs.writeFileSync(path.join(absoluteTarget, 'package.json'), `${JSON.stringify(packageJson, null, 2)}\n`)
-  fs.writeFileSync(path.join(absoluteTarget, 'app.js'), appJs)
-  fs.writeFileSync(path.join(absoluteTarget, 'plugins', 'sensible.js'), pluginSensible)
-  fs.writeFileSync(path.join(absoluteTarget, 'plugins', 'support.js'), pluginSupport)
-  fs.writeFileSync(path.join(absoluteTarget, 'routes', 'root.js'), routeRoot)
-  fs.writeFileSync(path.join(absoluteTarget, 'routes', 'root', 'index.js'), routeRootIndex)
-  fs.writeFileSync(path.join(absoluteTarget, 'test', 'helper.js'), testHelper)
-  fs.writeFileSync(path.join(absoluteTarget, 'test', 'plugins', 'support.test.js'), testPluginSupport)
-  fs.writeFileSync(path.join(absoluteTarget, 'test', 'routes', 'root.test.js'), testRouteRoot)
+  fs.writeFileSync(path.join(absoluteTarget, 'tsconfig.json'), `${JSON.stringify(tsconfig, null, 2)}\n`)
+  fs.writeFileSync(path.join(absoluteTarget, 'app.ts'), appTs)
+  fs.writeFileSync(path.join(absoluteTarget, 'plugins', 'sensible.ts'), pluginSensible)
+  fs.writeFileSync(path.join(absoluteTarget, 'plugins', 'support.ts'), pluginSupport)
+  fs.writeFileSync(path.join(absoluteTarget, 'routes', 'root.ts'), routeRoot)
+  fs.writeFileSync(path.join(absoluteTarget, 'routes', 'root', 'index.ts'), routeRootIndex)
+  fs.writeFileSync(path.join(absoluteTarget, 'test', 'helper.ts'), testHelper)
+  fs.writeFileSync(path.join(absoluteTarget, 'test', 'plugins', 'support.test.ts'), testPluginSupport)
+  fs.writeFileSync(path.join(absoluteTarget, 'test', 'routes', 'root.test.ts'), testRouteRoot)
   fs.writeFileSync(path.join(absoluteTarget, '.gitignore'), gitignore)
   fs.writeFileSync(path.join(absoluteTarget, '.env'), dotenv)
   fs.writeFileSync(path.join(absoluteTarget, 'README.md'), readme)
@@ -781,12 +826,12 @@ function generateProject(targetDir, resolvedOptions, pluginScaffolds) {
   }
 }
 
-function buildCustomPluginFiles(pluginScaffolds) {
+function buildCustomPluginFiles(pluginScaffolds: PluginScaffold[]): GeneratedFile[] {
   if (!pluginScaffolds || pluginScaffolds.length === 0) {
     return []
   }
 
-  const files = []
+  const files: GeneratedFile[] = []
   for (const pluginScaffold of pluginScaffolds) {
     files.push(...buildPluginFiles(pluginScaffold))
   }
@@ -794,7 +839,7 @@ function buildCustomPluginFiles(pluginScaffolds) {
   return files
 }
 
-function buildPluginFiles(pluginScaffold) {
+function buildPluginFiles(pluginScaffold: PluginScaffold): GeneratedFile[] {
   if (!pluginScaffold) {
     return []
   }
@@ -806,25 +851,25 @@ function buildPluginFiles(pluginScaffold) {
   const childPluginName = pluginScaffold.childPluginName || 'child'
 
   const indexLines = [
-    "'use strict'",
+    "import { FastifyInstance, FastifyPluginOptions } from 'fastify'",
     '',
-    'module.exports = async function (fastify, opts) {'
+    'export default async function (fastify: FastifyInstance, opts: FastifyPluginOptions): Promise<void> {'
   ]
 
   if (hasDecorator) {
-    indexLines.push("  require('./decorator')(fastify)")
+    indexLines.push("  import('./decorator').then((mod) => mod.default(fastify))")
   }
 
   for (const hookName of hookNames) {
-    indexLines.push(`  require('./hooks/${hookName}')(fastify)`)
+    indexLines.push(`  import('./hooks/${hookName}').then((mod) => mod.default(fastify))`)
   }
 
   for (const routeName of routeNames) {
-    indexLines.push(`  fastify.register(require('./routes/${routeName}'), { prefix: '/${routeName}' })`)
+    indexLines.push(`  fastify.register(import('./routes/${routeName}'), { prefix: '/${routeName}' })`)
   }
 
   if (pluginScaffold.childPluginName) {
-    indexLines.push(`  fastify.register(require('./plugins/${childPluginName}'))`)
+    indexLines.push(`  fastify.register(import('./plugins/${childPluginName}'))`)
   }
 
   if (routeNames.length === 0 && hookNames.length === 0 && !hasDecorator && !pluginScaffold.childPluginName) {
@@ -833,18 +878,18 @@ function buildPluginFiles(pluginScaffold) {
 
   indexLines.push('}', '')
 
-  const files = [{
-    relativePath: `${pluginRoot}/index.js`,
+  const files: GeneratedFile[] = [{
+    relativePath: `${pluginRoot}/index.ts`,
     content: indexLines.join('\n')
   }]
 
   for (const routeName of routeNames) {
     files.push({
-      relativePath: `${pluginRoot}/routes/${routeName}/index.js`,
+      relativePath: `${pluginRoot}/routes/${routeName}/index.ts`,
       content: [
-        "'use strict'",
+        "import { FastifyInstance, FastifyPluginOptions } from 'fastify'",
         '',
-        'module.exports = async function (fastify, opts) {',
+        'export default async function (fastify: FastifyInstance, opts: FastifyPluginOptions): Promise<void> {',
         "  fastify.get('/', async function (request, reply) {",
         `    return { plugin: '${pluginScaffold.pluginName}', route: '${routeName}' }`,
         '  })',
@@ -856,11 +901,11 @@ function buildPluginFiles(pluginScaffold) {
 
   for (const hookName of hookNames) {
     files.push({
-      relativePath: `${pluginRoot}/hooks/${hookName}.js`,
+      relativePath: `${pluginRoot}/hooks/${hookName}.ts`,
       content: [
-        "'use strict'",
+        "import { FastifyInstance } from 'fastify'",
         '',
-        'module.exports = function (fastify) {',
+        'export default function (fastify: FastifyInstance): void {',
         "  fastify.addHook('onRequest', async function (request, reply) {})",
         '}',
         ''
@@ -870,13 +915,13 @@ function buildPluginFiles(pluginScaffold) {
 
   if (hasDecorator) {
     files.push({
-      relativePath: `${pluginRoot}/decorator.js`,
+      relativePath: `${pluginRoot}/decorator.ts`,
       content: [
-        "'use strict'",
+        "import { FastifyInstance } from 'fastify'",
         '',
-        'module.exports = function (fastify) {',
+        'export default function (fastify: FastifyInstance): void {',
         "  fastify.decorate('" + pluginScaffold.pluginName + "Service', {",
-        '    ping () {',
+        '    ping(): string {',
         "      return 'pong'",
         '    }',
         '  })',
@@ -888,11 +933,11 @@ function buildPluginFiles(pluginScaffold) {
 
   if (pluginScaffold.childPluginName) {
     files.push({
-      relativePath: `${pluginRoot}/plugins/${childPluginName}.js`,
+      relativePath: `${pluginRoot}/plugins/${childPluginName}.ts`,
       content: [
-        "'use strict'",
+        "import { FastifyInstance, FastifyPluginOptions } from 'fastify'",
         '',
-        'module.exports = async function (fastify, opts) {',
+        'export default async function (fastify: FastifyInstance, opts: FastifyPluginOptions): Promise<void> {',
         "  fastify.decorate('" + childPluginName + "Ready', true)",
         '}',
         ''
@@ -903,8 +948,8 @@ function buildPluginFiles(pluginScaffold) {
   return files
 }
 
-function ensureNoDuplicateFilePaths(filePaths) {
-  const seen = new Set()
+function ensureNoDuplicateFilePaths(filePaths: string[]): void {
+  const seen = new Set<string>()
 
   for (const filePath of filePaths) {
     if (seen.has(filePath)) {
@@ -914,7 +959,7 @@ function ensureNoDuplicateFilePaths(filePaths) {
   }
 }
 
-function printHelp() {
+function printHelp(): void {
   stdout.write(`${colorize('Usage:', 'cyan')}\n`)
   stdout.write(`  ${colorize('fastify-new <new-directory>', 'bold')}\n`)
   stdout.write(`\n`)
@@ -923,11 +968,11 @@ function printHelp() {
   stdout.write(`- ${colorize('target must be a new directory', 'gray')}\n`)
 }
 
-function fail(message) {
+function fail(message: string): never {
   stderr.write(`${colorize('Error:', 'red')} ${message}\n`)
   exit(1)
 }
 
-main().catch((err) => {
+main().catch((err: unknown) => {
   fail(err instanceof Error ? err.message : 'Unexpected error')
 })

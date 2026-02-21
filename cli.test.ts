@@ -1,20 +1,24 @@
-'use strict'
-
-const { test } = require('node:test')
-const assert = require('node:assert')
-const { spawn } = require('child_process')
-const fs = require('node:fs')
-const path = require('node:path')
+import { test } from 'node:test'
+import assert from 'node:assert'
+import { spawn, ChildProcess } from 'node:child_process'
+import fs from 'node:fs'
+import path from 'node:path'
 
 const CLI_PATH = path.join(__dirname, 'cli.js')
 
+interface CliResult {
+  code: number | null
+  output: string
+  errorOutput: string
+}
+
 /**
  * Helper to run the CLI and feed it stdin inputs sequentially.
- * Each input is sent only after the CLI has printed its next prompt (a line ending with '> ').
+ * Each input is sent only after the CLI has printed its next prompt (a line ending with ': ').
  */
-function runCli(args, inputs = []) {
+function runCli(args: string[], inputs: string[] = []): Promise<CliResult> {
   return new Promise((resolve, reject) => {
-    const cp = spawn(process.execPath, [CLI_PATH, ...args], {
+    const cp: ChildProcess = spawn(process.execPath, [CLI_PATH, ...args], {
       cwd: __dirname,
       env: { ...process.env, NO_COLOR: '1' }
     })
@@ -23,21 +27,21 @@ function runCli(args, inputs = []) {
     let errorOutput = ''
     let inputIndex = 0
 
-    cp.stdout.on('data', (chunk) => {
+    cp.stdout!.on('data', (chunk: Buffer) => {
       output += chunk.toString()
 
       // The CLI prompt always ends with 'Select an option: ' or a field label like 'Port: '
       if (inputIndex < inputs.length && output.endsWith(': ')) {
         const next = inputs[inputIndex++]
-        cp.stdin.write(next + '\n')
+        cp.stdin!.write(next + '\n')
 
         if (inputIndex >= inputs.length) {
-          cp.stdin.end()
+          cp.stdin!.end()
         }
       }
     })
 
-    cp.stderr.on('data', (chunk) => {
+    cp.stderr!.on('data', (chunk: Buffer) => {
       errorOutput += chunk.toString()
     })
 
@@ -56,7 +60,7 @@ function runCli(args, inputs = []) {
 }
 
 test('CLI generates project with default setup and writes files', async () => {
-  const targetDir = path.join(__dirname, '.tmp-test-default')
+  const targetDir = path.join(__dirname, '..', '.tmp-test-default')
 
   if (fs.existsSync(targetDir)) {
     fs.rmSync(targetDir, { recursive: true, force: true })
@@ -64,22 +68,23 @@ test('CLI generates project with default setup and writes files', async () => {
 
   // Inputs:
   // '1' -> Default setup (quick start)
-  // '1' -> Run
-  const { code, output } = await runCli(['generate', '.tmp-test-default'], ['1', '1'])
+  // '1' -> Generate
+  const { code, output } = await runCli(['.tmp-test-default'], ['1', '5', '1'])
 
   assert.strictEqual(code, 0, 'CLI should exit with code 0')
   assert.match(output, /Project created in/, 'Output should confirm project creation')
 
   assert.ok(fs.existsSync(targetDir), 'Target directory should exist')
   assert.ok(fs.existsSync(path.join(targetDir, 'package.json')), 'package.json should be generated')
-  assert.ok(fs.existsSync(path.join(targetDir, 'app.js')), 'app.js should be generated')
-  assert.ok(fs.existsSync(path.join(targetDir, 'routes', 'root.js')), 'routes/root.js should be generated')
+  assert.ok(fs.existsSync(path.join(targetDir, 'app.ts')), 'app.ts should be generated')
+  assert.ok(fs.existsSync(path.join(targetDir, 'tsconfig.json')), 'tsconfig.json should be generated')
+  assert.ok(fs.existsSync(path.join(targetDir, 'routes', 'root.ts')), 'routes/root.ts should be generated')
 
   fs.rmSync(targetDir, { recursive: true, force: true })
 })
 
 test('CLI prompts for all categories in guided setup', async () => {
-  const targetDir = path.join(__dirname, '.tmp-test-guided')
+  const targetDir = path.join(__dirname, '..', '.tmp-test-guided')
 
   if (fs.existsSync(targetDir)) {
     fs.rmSync(targetDir, { recursive: true, force: true })
@@ -88,9 +93,10 @@ test('CLI prompts for all categories in guided setup', async () => {
   // Inputs:
   // '2' -> Guided setup
   // '1' x6 -> Skip each of the 6 categories
+  // '5' -> Done (plugin scaffold)
   // '2' -> Cancel
-  const inputs = ['2', '1', '1', '1', '1', '1', '1', '2']
-  const { code, output } = await runCli(['generate', '.tmp-test-guided'], inputs)
+  const inputs = ['2', '1', '1', '1', '1', '1', '1', '5', '2']
+  const { code, output } = await runCli(['.tmp-test-guided'], inputs)
 
   assert.strictEqual(code, 0, 'CLI should exit with code 0')
 
@@ -106,7 +112,7 @@ test('CLI prompts for all categories in guided setup', async () => {
 })
 
 test('CLI applies custom configurations for Network, Logging, and Debug categories', async () => {
-  const targetDir = path.join(__dirname, '.tmp-test-custom')
+  const targetDir = path.join(__dirname, '..', '.tmp-test-custom')
 
   if (fs.existsSync(targetDir)) {
     fs.rmSync(targetDir, { recursive: true, force: true })
@@ -129,10 +135,11 @@ test('CLI applies custom configurations for Network, Logging, and Debug categori
     '1',         // Skip Watch Mode
     '1',         // Skip Safety and Limits
     '1',         // Skip Trust Proxy
-    '1'          // Run
+    '5',         // Done (plugin scaffold)
+    '1'          // Generate
   ]
 
-  const { code, output } = await runCli(['generate', '.tmp-test-custom'], inputs)
+  const { code, output } = await runCli(['.tmp-test-custom'], inputs)
 
   assert.strictEqual(code, 0, 'CLI should exit with code 0')
 

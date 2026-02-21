@@ -4,9 +4,18 @@
   "description": "Interactive Fastify project scaffolder",
   "license": "MIT",
   "bin": {
-    "fastify-new": "./cli.js"
+    "fastify-new": "./dist/cli.js"
   },
   "scripts": {
-    "start": "node cli.js"
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "dev": "tsx cli.ts",
+    "test": "tsc && node --test dist/cli.test.js",
+    "pretest": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.11",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }
