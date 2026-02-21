@@ -324,8 +324,15 @@ function generateProject(targetDir, resolvedOptions) {
     },
     scripts: {
       test: 'node --test test/**/*.test.js',
-      start: 'node app.js',
-      dev: 'node app.js'
+      start: resolvedOptions.debug
+        ? `node --inspect=${resolvedOptions.debugHost ?? 'localhost'}:${resolvedOptions.debugPort ?? 9320} app.js`
+        : 'node app.js',
+      dev: [
+        'node',
+        resolvedOptions.watch ? '--watch' : '',
+        resolvedOptions.debug ? `--inspect=${resolvedOptions.debugHost ?? 'localhost'}:${resolvedOptions.debugPort ?? 9320}` : '',
+        'app.js'
+      ].filter(Boolean).join(' ')
     },
     keywords: ['fastify'],
     author: '',
