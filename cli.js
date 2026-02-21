@@ -294,44 +294,246 @@ function generateProject(targetDir, resolvedOptions) {
   const absoluteTarget = path.resolve(process.cwd(), targetDir)
   fs.mkdirSync(absoluteTarget, { recursive: false })
 
+  // Create subdirectories
+  fs.mkdirSync(path.join(absoluteTarget, 'plugins'), { recursive: false })
+  fs.mkdirSync(path.join(absoluteTarget, 'routes'), { recursive: false })
+  fs.mkdirSync(path.join(absoluteTarget, 'routes', 'root'), { recursive: false })
+  fs.mkdirSync(path.join(absoluteTarget, 'test'), { recursive: false })
+  fs.mkdirSync(path.join(absoluteTarget, 'test', 'plugins'), { recursive: false })
+  fs.mkdirSync(path.join(absoluteTarget, 'test', 'routes'), { recursive: false })
+
+  // package.json
   const packageJson = {
     name: path.basename(targetDir),
-    version: '0.1.0',
-    private: true,
-    scripts: {
-      start: 'node app.js'
+    version: '1.0.0',
+    description: 'A Fastify application',
+    main: 'app.js',
+    directories: {
+      test: 'test'
     },
+    scripts: {
+      test: 'node --test test/**/*.test.js',
+      start: 'fastify start -l info app.js',
+      dev: 'fastify start -w -l info -P app.js'
+    },
+    keywords: ['fastify'],
+    author: '',
+    license: 'ISC',
     dependencies: {
-      fastify: '^5.0.0'
-    }
+      '@fastify/autoload': '^6.0.0',
+      '@fastify/sensible': '^6.0.0',
+      fastify: '^5.0.0',
+      'fastify-cli': '^7.0.0',
+      'fastify-plugin': '^5.0.0'
+    },
+    devDependencies: {}
   }
 
+  // app.js — the entry point consumed by `fastify start`
   const appJs = [
     "'use strict'",
     '',
-    "const Fastify = require('fastify')",
+    "const path = require('node:path')",
+    "const AutoLoad = require('@fastify/autoload')",
     '',
-    `const app = Fastify({ logger: ${resolvedOptions.prettyLogs ? 'true' : 'false'} })`,
+    '// Pass --options via CLI arguments in command to enable these options.',
+    'const options = {}',
     '',
-    "app.get('/', async () => ({ hello: 'world' }))",
+    'module.exports = async function (fastify, opts) {',
+    '  // Place here your custom code!',
     '',
-    'app.listen({',
-    `  port: ${resolvedOptions.port ?? 3000},`,
-    resolvedOptions.address ? `  address: '${resolvedOptions.address}',` : '  // address uses platform default',
-    '}, (err) => {',
-    '  if (err) {',
-    '    app.log.error(err)',
-    '    process.exit(1)',
-    '  }',
-    "  app.log.info('server started')",
+    '  // Do not touch the following lines',
+    '',
+    '  // This loads all plugins defined in plugins',
+    '  // those should be support plugins that are reused',
+    '  // through your application',
+    '  fastify.register(AutoLoad, {',
+    "    dir: path.join(__dirname, 'plugins'),",
+    '    options: Object.assign({}, opts)',
+    '  })',
+    '',
+    '  // This loads all plugins defined in routes',
+    '  // define your routes in one of these',
+    '  fastify.register(AutoLoad, {',
+    "    dir: path.join(__dirname, 'routes'),",
+    '    options: Object.assign({}, opts)',
+    '  })',
+    '}',
+    '',
+    'module.exports.options = options',
+    ''
+  ].join('\n')
+
+  // plugins/sensible.js
+  const pluginSensible = [
+    "'use strict'",
+    '',
+    "const fp = require('fastify-plugin')",
+    "const sensible = require('@fastify/sensible')",
+    '',
+    '/**',
+    ' * This plugins adds some utilities to handle http errors',
+    ' *',
+    ' * @see https://github.com/fastify/fastify-sensible',
+    ' */',
+    'module.exports = fp(async function (fastify, opts) {',
+    '  fastify.register(sensible)',
     '})',
     ''
   ].join('\n')
 
+  // plugins/support.js
+  const pluginSupport = [
+    "'use strict'",
+    '',
+    "const fp = require('fastify-plugin')",
+    '',
+    '// the use of fastify-plugin is required to be able',
+    '// to export the decorators to the outer scope',
+    '',
+    '/**',
+    ' * This defines the support plugin for the application.',
+    ' * You can use fastify.someSupport() to call it from your routes.',
+    ' */',
+    'module.exports = fp(async function (fastify, opts) {',
+    "  fastify.decorate('someSupport', function () {",
+    "    return 'hugs'",
+    '  })',
+    '})',
+    ''
+  ].join('\n')
+
+  // routes/root.js
+  const routeRoot = [
+    "'use strict'",
+    '',
+    '/**',
+    ' * A plugin that provide encapsulated routes, under prefix',
+    ' * @param {FastifyInstance} fastify encapsulated fastify instance',
+    ' * @param {Object} options plugin options, refer to https://fastify.dev/docs/latest/Reference/Plugins/',
+    ' */',
+    'module.exports = async function (fastify, opts) {',
+    "  fastify.get('/', async function (request, reply) {",
+    "    return { root: true }",
+    '  })',
+    '}',
+    ''
+  ].join('\n')
+
+  // routes/root/index.js (auto-loaded as /root)
+  const routeRootIndex = [
+    "'use strict'",
+    '',
+    'module.exports = async function (fastify, opts) {',
+    "  fastify.get('/', async function (request, reply) {",
+    "    return 'root'",
+    '  })',
+    '}',
+    ''
+  ].join('\n')
+
+  // test/helper.js
+  const testHelper = [
+    "'use strict'",
+    '',
+    '// This file contains code that will be run before your tests.',
+    "const { build } = require('../app')",
+    '',
+    'async function buildApp (t) {',
+    '  const app = await build()',
+    '  t.after(() => app.close())',
+    '  return app',
+    '}',
+    '',
+    'module.exports = {',
+    '  buildApp',
+    '}',
+    ''
+  ].join('\n')
+
+  // test/plugins/support.test.js
+  const testPluginSupport = [
+    "'use strict'",
+    '',
+    "const { test } = require('node:test')",
+    "const assert = require('node:assert')",
+    "const { buildApp } = require('../helper')",
+    '',
+    "test('support plugin', async (t) => {",
+    '  const app = await buildApp(t)',
+    "  assert.ok(app.someSupport())",
+    '})',
+    ''
+  ].join('\n')
+
+  // test/routes/root.test.js
+  const testRouteRoot = [
+    "'use strict'",
+    '',
+    "const { test } = require('node:test')",
+    "const assert = require('node:assert')",
+    "const { buildApp } = require('../helper')",
+    '',
+    "test('root route', async (t) => {",
+    '  const app = await buildApp(t)',
+    "  const response = await app.inject({ method: 'GET', url: '/' })",
+    "  assert.strictEqual(response.statusCode, 200)",
+    "  assert.deepStrictEqual(JSON.parse(response.body), { root: true })",
+    '})',
+    ''
+  ].join('\n')
+
+  // .gitignore
+  const gitignore = [
+    'node_modules',
+    '.DS_Store',
+    '*.log',
+    'build',
+    'dist',
+    ''
+  ].join('\n')
+
+  // .env (used by fastify-cli for overrides at runtime)
+  const dotenv = [
+    `PORT=${resolvedOptions.port ?? 3000}`,
+    resolvedOptions.address ? `ADDRESS=${resolvedOptions.address}` : '# ADDRESS=',
+    `LOG_LEVEL=${resolvedOptions.logLevel ?? 'fatal'}`,
+    ''
+  ].join('\n')
+
+  // README.md
   const readme = [
     `# ${path.basename(targetDir)}`,
     '',
-    'Generated with the MVP guided flow.',
+    'Generated with the Fastify guided CLI.',
+    '',
+    '## Getting started',
+    '',
+    '```bash',
+    'npm install',
+    'npm run dev   # watch mode',
+    'npm start     # production',
+    'npm test      # run tests',
+    '```',
+    '',
+    '## Project layout',
+    '',
+    '```',
+    '├── app.js            # entry point (loaded by fastify-cli)',
+    '├── plugins/          # shared plugins (decorated on fastify instance)',
+    '│   ├── sensible.js',
+    '│   └── support.js',
+    '├── routes/           # encapsulated route plugins',
+    '│   ├── root.js',
+    '│   └── root/',
+    '│       └── index.js',
+    '└── test/',
+    '    ├── helper.js',
+    '    ├── plugins/',
+    '    │   └── support.test.js',
+    '    └── routes/',
+    '        └── root.test.js',
+    '```',
     '',
     '## Resolved setup',
     '```json',
@@ -340,8 +542,18 @@ function generateProject(targetDir, resolvedOptions) {
     ''
   ].join('\n')
 
+  // Write all files
   fs.writeFileSync(path.join(absoluteTarget, 'package.json'), `${JSON.stringify(packageJson, null, 2)}\n`)
   fs.writeFileSync(path.join(absoluteTarget, 'app.js'), appJs)
+  fs.writeFileSync(path.join(absoluteTarget, 'plugins', 'sensible.js'), pluginSensible)
+  fs.writeFileSync(path.join(absoluteTarget, 'plugins', 'support.js'), pluginSupport)
+  fs.writeFileSync(path.join(absoluteTarget, 'routes', 'root.js'), routeRoot)
+  fs.writeFileSync(path.join(absoluteTarget, 'routes', 'root', 'index.js'), routeRootIndex)
+  fs.writeFileSync(path.join(absoluteTarget, 'test', 'helper.js'), testHelper)
+  fs.writeFileSync(path.join(absoluteTarget, 'test', 'plugins', 'support.test.js'), testPluginSupport)
+  fs.writeFileSync(path.join(absoluteTarget, 'test', 'routes', 'root.test.js'), testRouteRoot)
+  fs.writeFileSync(path.join(absoluteTarget, '.gitignore'), gitignore)
+  fs.writeFileSync(path.join(absoluteTarget, '.env'), dotenv)
   fs.writeFileSync(path.join(absoluteTarget, 'README.md'), readme)
 }
 

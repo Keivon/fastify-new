@@ -140,3 +140,6 @@ vite.config.ts.timestamp-*
 
 # mac files
 .DS_Store
+
+# test file
+test
